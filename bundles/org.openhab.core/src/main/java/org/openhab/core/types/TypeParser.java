@@ -18,92 +18,104 @@ import java.util.List;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * This is a helper class that helps parsing a string into an openHAB type (state or command).
- *
+ * Helper class to parse strings into openHAB types (State or Command).
+ * <p>
+ * This class uses reflection to call the valueOf(String) method on the corresponding type class.
+ * Refactored to reduce duplicate code, improve logging, and improve maintainability.
+ * </p>
+ * 
  * @author Kai Kreuzer - Initial contribution
  */
 @NonNullByDefault
 public final class TypeParser {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(TypeParser.class);
+
     private static final String CORE_LIBRARY_PACKAGE = "org.openhab.core.library.types.";
     private static final String VALUE_OF = "valueOf";
 
-    /**
-     * No instances allowed.
-     */
+    /** Private constructor to prevent instantiation */
     private TypeParser() {
     }
 
     /**
-     * Parses a string into a type.
-     *
-     * @param typeName name of the type, for example StringType.
-     * @param input input string to parse.
-     * @return Parsed type or null, if the type couldn't be parsed.
+     * Parses a string into a type instance.
+     * 
+     * @param typeName fully qualified type name or simple name like "StringType"
+     * @param input string input to parse
+     * @return Parsed type or null if parsing fails
      */
     public static @Nullable Type parseType(String typeName, String input) {
         try {
             Class<?> stateClass = Class.forName(CORE_LIBRARY_PACKAGE + typeName);
-            Method valueOfMethod = stateClass.getMethod(VALUE_OF, String.class);
-            return (Type) valueOfMethod.invoke(stateClass, input);
-        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException
-                | InvocationTargetException e) {
+            return invokeValueOf(stateClass, input, Type.class);
+        } catch (ClassNotFoundException e) {
+            LOGGER.debug("Type class not found: {}", typeName, e);
         }
         return null;
     }
 
     /**
-     * <p>
-     * Determines a state from a string. Possible state types are passed as a parameter. Note that the order matters
-     * here; the first type that accepts the string as a valid value, will be used for the state.
-     *
-     * <p>
-     * Example: The type list is OnOffType.class,StringType.class. The string "ON" is now accepted by the OnOffType and
-     * thus OnOffType.ON will be returned (and not a StringType with value "ON").
-     *
-     * @param types possible types of the state to consider
-     * @param s the string to parse
-     * @return the corresponding State instance or <code>null</code>
+     * Parses a string into a State instance using a list of possible state types.
+     * 
+     * @param types List of possible State classes
+     * @param s Input string
+     * @return First matching State instance or null
      */
     public static @Nullable State parseState(List<Class<? extends State>> types, String s) {
-        for (Class<? extends State> type : types) {
-            try {
-                Method valueOf = type.getMethod(VALUE_OF, String.class);
-                if (valueOf.invoke(type, s) instanceof State state) {
-                    return state;
-                }
-            } catch (NoSuchMethodException | IllegalArgumentException | IllegalAccessException
-                    | InvocationTargetException e) {
+        return parseGeneric(types, s, State.class);
+    }
+
+    /**
+     * Parses a string into a Command instance using a list of possible command types.
+     * 
+     * @param types List of possible Command classes
+     * @param s Input string
+     * @return First matching Command instance or null
+     */
+    public static @Nullable Command parseCommand(List<Class<? extends Command>> types, String s) {
+        return parseGeneric(types, s, Command.class);
+    }
+
+    /**
+     * Generic parser that iterates through a list of classes and invokes valueOf(String).
+     * Returns the first successfully parsed instance of type T.
+     */
+    private static <T> @Nullable T parseGeneric(List<Class<? extends T>> types, String s, Class<T> expectedClassType) {
+        for (Class<? extends T> type : types) {
+            T value = invokeValueOf(type, s, expectedClassType);
+            if (value != null) {
+                return value;
             }
         }
         return null;
     }
 
     /**
-     * <p>
-     * Determines a command from a string. Possible command types are passed as a parameter. Note that the order matters
-     * here; the first type that accepts the string as a valid value, will be used for the command.
-     *
-     * <p>
-     * Example: The type list is OnOffType.class,StringType.class. The string "ON" is now accepted by the OnOffType and
-     * thus OnOffType.ON will be returned (and not a StringType with value "ON").
-     *
-     * @param types possible types of the command to consider
-     * @param s the string to parse
-     * @return the corresponding Command instance or <code>null</code>
+     * Invokes the static valueOf(String) method on the given class.
+     * 
+     * @param <T> Expected return type
+     * @param typeClass Class to invoke valueOf on
+     * @param input Input string
+     * @param expectedClassType Expected class type
+     * @return Parsed instance or null if parsing failed
      */
-    public static @Nullable Command parseCommand(List<Class<? extends Command>> types, String s) {
-        for (Class<? extends Command> type : types) {
-            try {
-                Method valueOf = type.getMethod(VALUE_OF, String.class);
-                if (valueOf.invoke(type, s) instanceof Command value) {
-                    return value;
-                }
-            } catch (NoSuchMethodException | IllegalArgumentException | IllegalAccessException
-                    | InvocationTargetException e) {
+    private static <T> @Nullable T invokeValueOf(Class<?> typeClass, String input, Class<T> expectedClassType) {
+        try {
+            Method valueOfMethod = typeClass.getMethod(VALUE_OF, String.class);
+            Object result = valueOfMethod.invoke(null, input);
+            // Ensures the result actually is a Type
+            if (expectedClassType.isInstance(result)) {
+                return expectedClassType.cast(result);
             }
+        } catch (NoSuchMethodException e) {
+            LOGGER.debug("No valueOf(String) method in class: {}", typeClass.getName(), e);
+        } catch (IllegalAccessException | InvocationTargetException | IllegalArgumentException e) {
+            LOGGER.debug("Failed to invoke valueOf on class {} with input '{}'", typeClass.getName(), input, e);
         }
         return null;
     }
