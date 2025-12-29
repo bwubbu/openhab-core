@@ -87,7 +87,7 @@ public class BundleVersion {
             return false;
         }
 
-        String endString = matcher.group("endmicro") != null ? matcher.group("end") : matcher.group("stop") + ".0";
+        String endString = matcher.group("endmicro") != null ? matcher.group("end") : matcher.group("end") + ".0";
         boolean inclusive = "]".equals(matcher.group("endtype"));
         BundleVersion endVersion = new BundleVersion(endString);
         int comparison = this.compareTo(endVersion);
