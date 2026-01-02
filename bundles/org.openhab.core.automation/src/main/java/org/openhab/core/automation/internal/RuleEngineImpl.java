@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -218,6 +219,16 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
     private @Nullable EventPublisher eventPublisher;
 
     private static final String SOURCE = RuleEngineImpl.class.getSimpleName();
+
+    /**
+     * The tracker for the number of executions per minute.
+     */
+    private final Map<String, ExecutionStats> loopTracker = new ConcurrentHashMap<>();
+
+    /**
+     * The threshold for the number of executions per minute.
+     */
+    private static final int THRESHOLD = 50;
 
     private final ModuleHandlerCallback moduleHandlerCallback = new ModuleHandlerCallback() {
 
@@ -1043,13 +1054,76 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
     }
 
     /**
-     * This method runs a {@link Rule}. It is called by the {@link TriggerHandlerCallback}'s thread when a new
-     * {@link TriggerData} is available. This method switches
+     * A data structure used for Software Rejuvenation to track the execution health of rules.
+     * It stores the frequency of execution within a specific time window to detect 
+     * resource-intensive loops.
+     */
+    private static class ExecutionStats {
+        /** The cumulative count of executions in the current time window. */
+        final AtomicInteger count = new AtomicInteger(0);
+        
+        /** The timestamp (in milliseconds) of the last counter reset. */
+        long lastReset;
+
+        /**
+         * Creates a new tracker for a specific rule.
+         * * @param lastReset The initial timestamp for the tracking window.
+         */
+        ExecutionStats(long lastReset) { 
+            this.lastReset = lastReset; 
+        }
+    }
+    
+    /**
+     * Identifying potential infinite execution loops.
+     * This acts as a "Circuit Breaker" to prevent software aging and CPU exhaustion.
+     * @param ruleUID The unique identifier of the rule to check.
+     * @return true if the rule has exceeded the safety threshold within the last minute, 
+     * indicating a potential loop.
+     */
+    private boolean isPotentialLoop(String ruleUID) {
+        if (ruleUID == null) {
+            return false; 
+        }
+
+        long now = System.currentTimeMillis();
+
+        // computeIfAbsent ensures we get a non-null object back safely
+        ExecutionStats stats = loopTracker.computeIfAbsent(ruleUID, k -> new ExecutionStats(now));
+        
+        // Satisfies compiler null-safety and defensive programming standards
+        if (stats == null) {
+            return false; 
+        }
+
+        // Synchronize on the stats object to ensure thread-safe updates to the reset timer
+        synchronized (stats) {
+            if (now - stats.lastReset > 60000) { // Reset every minute
+                stats.count.set(0);
+                stats.lastReset = now;
+            }
+        }
+
+        return stats.count.incrementAndGet() > THRESHOLD;
+    }
+
+    /**
+     * This method runs a {@link Rule}. It is called by the {@link TriggerHandlerCallback}'s thread 
+     * when a new {@link TriggerData} is available.
+     * This method includes a Circuit Breaker check 
+     * to prevent infinite loops from affecting system high-availability.</p>
      *
      * @param ruleUID the {@link Rule} which has to evaluate new {@link TriggerData}.
      * @param td {@link TriggerData} object containing new values for {@link Trigger}'s {@link Output}s
      */
     protected void runRule(String ruleUID, TriggerHandlerCallbackImpl.TriggerData td) {
+        // Circuit Breaker: Proactively halt execution if a loop is detected
+        if (isPotentialLoop(ruleUID)) {
+            logger.error("Circuit Breaker triggered for rule {}. " +
+                        "Halted execution to prevent CPU exhaustion from a suspected loop.", ruleUID);
+            return; 
+        }
+
         if (thCallbacks.get(ruleUID) == null) {
             // the rule was unregistered
             return;
@@ -1096,12 +1170,21 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
     @Override
     public Map<String, @Nullable Object> runNow(String ruleUID, boolean considerConditions,
             @Nullable Map<String, Object> context) {
+        
         Map<String, @Nullable Object> returnContext = new HashMap<>();
+        
+        // Validate input to prevent NullPointerException in ConcurrentHashMap
+        if (ruleUID == null) {
+            logger.warn("Preventive Maintenance: Ignored runNow request with null ruleUID.");
+            return returnContext;
+        }
+
         final WrappedRule rule = getManagedRule(ruleUID);
         if (rule == null) {
             logger.warn("Failed to execute rule '{}': Invalid Rule UID", ruleUID);
             return returnContext;
         }
+        
         synchronized (this) {
             final RuleStatus ruleStatus = getRuleStatus(ruleUID);
             if (ruleStatus != null && ruleStatus != RuleStatus.IDLE) {
@@ -1243,10 +1326,12 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
     }
 
     /**
-     * This method checks if all rule's condition are satisfied or not.
+     * Checks if all conditions of a rule are satisfied.
+     * Enhanced with diagnostic observability to 
+     * log failed condition inputs, reducing future maintenance troubleshooting time.</p>
      *
      * @param rule the checked rule
-     * @return true when all conditions of the rule are satisfied, false otherwise.
+     * @return true when all conditions are satisfied, false otherwise.
      */
     private boolean calculateConditions(WrappedRule rule) {
         List<WrappedCondition> conditions = rule.getConditions();
@@ -1264,7 +1349,13 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
             ConditionHandler tHandler = wrappedCondition.getModuleHandler();
             Map<String, @Nullable Object> context = getContext(ruleUID, wrappedCondition.getConnections());
             if (tHandler != null && !tHandler.isSatisfied(Collections.unmodifiableMap(context))) {
-                logger.debug("The condition '{}' of rule '{}' is unsatisfied.", condition.getId(), ruleUID);
+                // Diagnostic log: record inputs causing the skip
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Rule '{}' skip: Condition '{}' failed. Inputs provided: {}", 
+                        ruleUID, condition.getId(), context);
+                } else {
+                    logger.debug("The condition '{}' of rule '{}' is unsatisfied.", condition.getId(), ruleUID);
+                }
                 return false;
             }
         }
