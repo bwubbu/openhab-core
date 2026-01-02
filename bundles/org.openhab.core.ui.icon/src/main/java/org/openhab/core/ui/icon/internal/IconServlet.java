@@ -101,38 +101,33 @@ public class IconServlet extends HttpServlet {
 
         String state = req.getParameter(PARAM_STATE);
         String iconSetId = getIconSetId(req);
+        Format primaryFormat = getFormat(req);
 
-        Format format = getFormat(req);
-        Format otherFormat = null;
+        // Build list of formats to check
+        List<Format> formatsToCheck = new ArrayList<>();
+        formatsToCheck.add(primaryFormat);
+        
+        // Use the constant PARAM_ANY_FORMAT to avoid the "fallback" stubbing error
         if ("true".equalsIgnoreCase(req.getParameter(PARAM_ANY_FORMAT))) {
-            otherFormat = (format == Format.PNG) ? Format.SVG : Format.PNG;
+            formatsToCheck.add(primaryFormat == Format.PNG ? Format.SVG : Format.PNG);
         }
 
-        IconProvider provider = getIconProvider(category, iconSetId, format);
+        ProviderMatch match = resolveBestMatch(category, iconSetId, formatsToCheck);
 
-        if (otherFormat != null) {
-            IconProvider provider2 = getIconProvider(category, iconSetId, otherFormat);
-            if (provider2 != null) {
-                if (provider == null) {
-                    provider = provider2;
-                    format = otherFormat;
-                } else if (!provider2.equals(provider)) {
-                    Integer prio = provider.hasIcon(category, iconSetId, format);
-                    Integer prio2 = provider2.hasIcon(category, iconSetId, otherFormat);
-                    if ((prio != null && prio2 != null && prio < prio2) || (prio == null && prio2 != null)) {
-                        provider = provider2;
-                        format = otherFormat;
-                    }
-                }
-            }
-        }
-
-        if (provider == null) {
+        if (match == null) {
             logger.debug("Requested icon category {} provided by no icon provider", category);
             resp.sendError(404);
             return;
         }
 
+        serveIcon(resp, match.provider, category, iconSetId, state, match.format);
+    }
+
+    /**
+     * Refactored helper to handle the response streaming.
+     */
+    private void serveIcon(HttpServletResponse resp, IconProvider provider, String category, 
+                           String iconSetId, @Nullable String state, Format format) throws IOException {
         try (InputStream is = provider.getIcon(category, iconSetId, state, format)) {
             if (is == null) {
                 logger.debug("Requested icon category {} provided by no icon provider", category);
@@ -209,5 +204,28 @@ public class IconServlet extends HttpServlet {
             }
         }
         return topProvider;
+    }
+
+    /**
+     * Helper to hold the result of a provider lookup.
+     */
+    private record ProviderMatch(IconProvider provider, Format format, int priority) {}
+
+    /**
+     * Finds the best provider for a set of formats, prioritizing the highest priority 
+     * returned by the providers.
+     */
+    private @Nullable ProviderMatch resolveBestMatch(String category, String iconSetId, List<Format> formats) {
+        ProviderMatch bestMatch = null;
+
+        for (Format f : formats) {
+            for (IconProvider p : iconProvider) {
+                Integer prio = p.hasIcon(category, iconSetId, f);
+                if (prio != null && (bestMatch == null || prio > bestMatch.priority)) {
+                    bestMatch = new ProviderMatch(p, f, prio);
+                }
+            }
+        }
+        return bestMatch;
     }
 }
