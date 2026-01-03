@@ -15,7 +15,15 @@ package org.openhab.core.addon.eclipse.internal;
 import static java.util.Map.entry;
 import static org.openhab.core.addon.AddonType.*;
 
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.HttpURLConnection;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -24,6 +32,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import javax.net.ssl.SSLException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -39,6 +49,8 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This is an implementation of an {@link AddonService} that can be used when debugging in Eclipse.
@@ -52,12 +64,20 @@ public class EclipseAddonService implements AddonService {
 
     public static final String CONFIG_URI = "system:addons";
 
+    private static final Logger logger = LoggerFactory.getLogger(EclipseAddonService.class);
+
     private static final String SERVICE_ID = "eclipse";
     private static final String ADDON_ID_PREFIX = SERVICE_ID + ":";
 
     private static final String ADDONS_CONTENT_TYPE = "application/vnd.openhab.bundle";
     private static final String ADDONS_AUTHOR = "openHAB";
     private static final String BUNDLE_SYMBOLIC_NAME_PREFIX = "org.openhab.";
+
+    private static final String REPO_URI_PROPERTY = "openhab.eclipse.addon.repoUri";
+    private static final URI DEFAULT_REPO_URI = URI.create("https://www.openhab.org/");
+
+    private static final int CONNECT_TIMEOUT_MS = 1500;
+    private static final int READ_TIMEOUT_MS = 1500;
 
     private static final Map<String, String> ADDON_BUNDLE_TYPE_MAP = Map.ofEntries(
             entry(AUTOMATION.getId(), "automation"), //
@@ -93,6 +113,7 @@ public class EclipseAddonService implements AddonService {
 
     @Deactivate
     protected void deactivate() {
+        throw new UnsupportedOperationException("Not supported by EclipseAddonService");
     }
 
     @Override
@@ -107,6 +128,17 @@ public class EclipseAddonService implements AddonService {
 
     @Override
     public void refreshSource() {
+        URI repoUri = readRepoUri();
+        try {
+            ensureRepoReachable(repoUri);
+            logger.debug("refreshSource: repo reachable: {}", repoUri);
+        } catch (IOException e) {
+            // Clear message for offline/proxy cases
+            logger.warn("refreshSource: repository unreachable (offline/proxy/firewall?): {}. {}", repoUri,
+                    e.getMessage());
+            throw new IllegalStateException("Cannot refresh add-on source because repository is unreachable: " + repoUri
+                    + ". Check network/proxy/firewall settings.", e);
+        }
     }
 
     @Override
@@ -190,5 +222,79 @@ public class EclipseAddonService implements AddonService {
     @Override
     public @Nullable String getAddonId(URI extensionURI) {
         return null;
+    }
+
+    /**
+     * Reads the repo URI from a system property to allow adaptation to different environments.
+     * If not provided, a safe default is used.
+     */
+    protected URI readRepoUri() {
+        String configured = System.getProperty(REPO_URI_PROPERTY);
+        if (configured == null || configured.isBlank()) {
+            return DEFAULT_REPO_URI;
+        }
+        try {
+            return URI.create(configured.trim());
+        } catch (IllegalArgumentException e) {
+            // If misconfigured, fall back but log clearly.
+            logger.warn("Invalid repo URI configured in -D{}='{}'. Falling back to default '{}'.", REPO_URI_PROPERTY,
+                    configured, DEFAULT_REPO_URI);
+            return DEFAULT_REPO_URI;
+        }
+    }
+
+    /**
+     * Lightweight reachability check using a HEAD request. Works with proxies configured at JVM/OS level.
+     * Accepts any HTTP 2xx-4xx response as "reachable" (4xx still proves network path works).
+     */
+    private void ensureRepoReachable(URI repoUri) throws IOException {
+        URL url = repoUri.toURL();
+
+        List<Proxy> proxies = ProxySelector.getDefault() != null ? ProxySelector.getDefault().select(repoUri)
+                : List.of(Proxy.NO_PROXY);
+        if (proxies == null || proxies.isEmpty()) {
+            proxies = List.of(Proxy.NO_PROXY);
+        }
+
+        IOException last = null;
+
+        for (Proxy proxy : proxies) {
+            try {
+                HttpURLConnection conn = openHeadConnection(url, proxy);
+                conn.setInstanceFollowRedirects(true);
+                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                conn.setReadTimeout(READ_TIMEOUT_MS);
+
+                int code = conn.getResponseCode();
+
+                // 2xx-4xx => we can reach the server (401/403/404 still means reachable)
+                if (code >= 200 && code < 500) {
+                    return;
+                }
+
+                last = new IOException("Repository returned HTTP " + code);
+            } catch (UnknownHostException e) {
+                last = new IOException("Host cannot be resolved (DNS). Likely offline or blocked by DNS.", e);
+            } catch (SocketTimeoutException e) {
+                last = new IOException("Connection timed out. Possible proxy/offline/firewall.", e);
+            } catch (ConnectException e) {
+                last = new IOException("Connection refused. Server down or blocked by network/proxy.", e);
+            } catch (SSLException e) {
+                last = new IOException("SSL/TLS handshake failed (certificate or proxy interception issue).", e);
+            } catch (IOException e) {
+                last = e;
+            }
+        }
+
+        if (last != null) {
+            throw last;
+        }
+        throw new IOException("Repository is unreachable.");
+    }
+
+    protected HttpURLConnection openHeadConnection(URL url, Proxy proxy) throws IOException {
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection(proxy);
+        conn.setRequestMethod("HEAD");
+        return conn;
     }
 }
