@@ -38,15 +38,22 @@ public class RuleEngineImplTest {
         storageService = mock(StorageService.class);
         readyService = mock(ReadyService.class);
         startLevelService = mock(StartLevelService.class);
-        
+
         // Fix the Generics Mismatch
         // We mock a Storage of Boolean since that is what RuleEngineImpl expects
         Storage<Boolean> disabledStorage = mock(Storage.class);
 
         // Use a flexible stubbing for the StorageService
         // We use any() for the ClassLoader to avoid strict match errors
-        when(storageService.getStorage(eq("automation_rules_disabled"), any()))
-            .thenReturn((Storage) disabledStorage); // Cast to raw Storage to bypass strict generic check
+        when(storageService.getStorage(eq("automation_rules_disabled"), any())).thenReturn((Storage) disabledStorage); // Cast
+                                                                                                                       // to
+                                                                                                                       // raw
+                                                                                                                       // Storage
+                                                                                                                       // to
+                                                                                                                       // bypass
+                                                                                                                       // strict
+                                                                                                                       // generic
+                                                                                                                       // check
 
         when(ruleRegistry.getAll()).thenReturn(Collections.emptyList());
 
@@ -55,21 +62,21 @@ public class RuleEngineImplTest {
 
     /**
      * TEST: Circuit Breaker (Software Rejuvenation)
-     * Intention: Ensure that if a rule triggers excessively (potential loop), 
+     * Intention: Ensure that if a rule triggers excessively (potential loop),
      * the system proactively halts execution to prevent CPU exhaustion.
      */
     @Test
     public void testCircuitBreaker_PreventiveMaintenance() {
         String ruleUID = "loopingRule01";
-        
+
         // Mock TriggerData
         TriggerData mockTriggerData = mock(TriggerData.class);
         when(mockTriggerData.getTrigger()).thenReturn(mock(org.openhab.core.automation.Trigger.class));
-        
+
         // Mock the Rule itself to prevent null pointers during runRule logic
         // We simulate a situation where the rule is registered and "Ready"
         // Note: In a real environment, runNow/runRule checks if the rule exists in managedRules.
-        
+
         // Simulate 60 rapid triggers (Threshold is 50)
         int executionCount = 0;
         for (int i = 1; i <= 60; i++) {
@@ -78,12 +85,12 @@ public class RuleEngineImplTest {
         }
 
         // Verification logic:
-        // Because of our isPotentialLoop() check, calls 51 through 60 should have 
+        // Because of our isPotentialLoop() check, calls 51 through 60 should have
         // returned early before hitting the core execution logic.
-        
+
         assertTrue(executionCount > 50, "Simulated triggers should exceed threshold");
-        
-        // In your assignment report, you can demonstrate that after 50 calls, 
+
+        // In your assignment report, you can demonstrate that after 50 calls,
         // the logger.error() was triggered instead of rule execution logic.
     }
 
