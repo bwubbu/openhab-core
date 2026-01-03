@@ -13,10 +13,13 @@
 package org.openhab.core.automation.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.Collections;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openhab.core.automation.RuleRegistry;
@@ -35,51 +38,59 @@ import org.openhab.core.storage.StorageService;
 @NonNullByDefault
 public class RuleEngineImplTest {
 
-    private RuleEngineImpl ruleEngine;
-    private RuleRegistry ruleRegistry;
-    private ModuleTypeRegistry mtRegistry;
-    private StorageService storageService;
-    private ReadyService readyService;
-    private StartLevelService startLevelService;
+    private @Nullable RuleEngineImpl ruleEngine;
+    private @Nullable RuleRegistry ruleRegistry;
+    private @Nullable ModuleTypeRegistry mtRegistry;
+    private @Nullable StorageService storageService;
+    private @Nullable ReadyService readyService;
+    private @Nullable StartLevelService startLevelService;
+
+    /**
+     * Helper to provide a null value that bypasses the @NonNull compiler check.
+     */
+    private static <T> T giveNull() {
+        return null;
+    }
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "null" })
     public void setUp() {
-        // Initialize mocks
         mtRegistry = mock(ModuleTypeRegistry.class);
         ruleRegistry = mock(RuleRegistry.class);
         storageService = mock(StorageService.class);
         readyService = mock(ReadyService.class);
         startLevelService = mock(StartLevelService.class);
 
-        // Fix the Generics Mismatch
-        // We mock a Storage of Boolean since that is what RuleEngineImpl expects
         Storage<Boolean> disabledStorage = mock(Storage.class);
 
-        // Use a flexible stubbing for the StorageService
-        // We use any() for the ClassLoader to avoid strict match errors
-        when(storageService.getStorage(eq("automation_rules_disabled"), any())).thenReturn((Storage) disabledStorage); // Cast
-                                                                                                                       // to
-                                                                                                                       // raw
-                                                                                                                       // Storage
-                                                                                                                       // to
-                                                                                                                       // bypass
-                                                                                                                       // strict
-                                                                                                                       // generic
-                                                                                                                       // check
+        StorageService ss = storageService;
+        if (ss != null) {
+            // Explicitly cast any() to ClassLoader to satisfy JDT
+            when(ss.getStorage(eq("automation_rules_disabled"), any(ClassLoader.class)))
+                    .thenReturn((Storage) mock(Storage.class));
+        }
+        RuleRegistry rr = ruleRegistry;
+        ModuleTypeRegistry mtr = mtRegistry;
+        ReadyService rs = readyService;
+        StartLevelService sls = startLevelService;
 
-        when(ruleRegistry.getAll()).thenReturn(Collections.emptyList());
+        if (ss != null && rr != null && mtr != null && rs != null && sls != null) {
+            when(ss.getStorage(eq("automation_rules_disabled"), any(ClassLoader.class)))
+                    .thenReturn((Storage) disabledStorage);
+            when(rr.getAll()).thenReturn(Collections.emptyList());
 
-        ruleEngine = new RuleEngineImpl(mtRegistry, ruleRegistry, storageService, readyService, startLevelService);
+            ruleEngine = new RuleEngineImpl(mtr, rr, ss, rs, sls);
+        }
     }
 
-    /**
-     * TEST: Circuit Breaker (Software Rejuvenation)
-     * Intention: Ensure that if a rule triggers excessively (potential loop),
-     * the system proactively halts execution to prevent CPU exhaustion.
-     */
     @Test
     public void testCircuitBreakerPreventiveMaintenance() {
+        RuleEngineImpl engine = ruleEngine;
+        if (engine == null) {
+            fail("RuleEngine was not initialized");
+            return;
+        }
+
         String ruleUID = "loopingRule01";
 
         // Mock TriggerData
@@ -93,7 +104,7 @@ public class RuleEngineImplTest {
         // Simulate 60 rapid triggers (Threshold is 50)
         int executionCount = 0;
         for (int i = 1; i <= 60; i++) {
-            ruleEngine.runRule(ruleUID, mockTriggerData);
+            engine.runRule(ruleUID, mockTriggerData);
             executionCount++;
         }
 
@@ -102,19 +113,21 @@ public class RuleEngineImplTest {
         // returned early before hitting the core execution logic.
 
         assertTrue(executionCount > 50, "Simulated triggers should exceed threshold");
-
-        // In your assignment report, you can demonstrate that after 50 calls,
-        // the logger.error() was triggered instead of rule execution logic.
     }
 
     /**
      * TEST: Defensive Programming - Null Safety
-     * Intention: Ensure the engine doesn't crash if a null ruleUID is passed.
+     * We use giveNull() to fake a null value. This bypasses the
+     * JDT compiler's strict @NonNull check without needing ugly casts.
      */
     @Test
     public void testNullRuleSafety() {
-        assertDoesNotThrow(() -> {
-            ruleEngine.runNow(null);
-        }, "Engine should handle null ruleUID gracefully as part of preventive hardening.");
+        RuleEngineImpl engine = ruleEngine;
+        if (engine != null) {
+            assertDoesNotThrow(() -> {
+                // Use the local giveNull() with <String> to match the parameter type
+                engine.runNow(RuleEngineImplTest.<String> giveNull());
+            }, "Engine should handle null ruleUID gracefully.");
+        }
     }
 }
