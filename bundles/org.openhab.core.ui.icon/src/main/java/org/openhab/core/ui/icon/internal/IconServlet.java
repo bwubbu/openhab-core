@@ -106,7 +106,7 @@ public class IconServlet extends HttpServlet {
         // Build list of formats to check
         List<Format> formatsToCheck = new ArrayList<>();
         formatsToCheck.add(primaryFormat);
-        
+
         // Use the constant PARAM_ANY_FORMAT to avoid the "fallback" stubbing error
         if ("true".equalsIgnoreCase(req.getParameter(PARAM_ANY_FORMAT))) {
             formatsToCheck.add(primaryFormat == Format.PNG ? Format.SVG : Format.PNG);
@@ -126,8 +126,8 @@ public class IconServlet extends HttpServlet {
     /**
      * Refactored helper to handle the response streaming.
      */
-    private void serveIcon(HttpServletResponse resp, IconProvider provider, String category, 
-                           String iconSetId, @Nullable String state, Format format) throws IOException {
+    private void serveIcon(HttpServletResponse resp, IconProvider provider, String category, String iconSetId,
+            @Nullable String state, Format format) throws IOException {
         try (InputStream is = provider.getIcon(category, iconSetId, state, format)) {
             if (is == null) {
                 logger.debug("Requested icon category {} provided by no icon provider", category);
@@ -209,10 +209,11 @@ public class IconServlet extends HttpServlet {
     /**
      * Helper to hold the result of a provider lookup.
      */
-    private record ProviderMatch(IconProvider provider, Format format, int priority) {}
+    private record ProviderMatch(IconProvider provider, Format format, int priority) {
+    }
 
     /**
-     * Finds the best provider for a set of formats, prioritizing the highest priority 
+     * Finds the best provider for a set of formats, prioritizing the highest priority
      * returned by the providers.
      */
     private @Nullable ProviderMatch resolveBestMatch(String category, String iconSetId, List<Format> formats) {
