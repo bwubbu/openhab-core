@@ -1176,7 +1176,7 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
 
         // Validate input to prevent NullPointerException in ConcurrentHashMap
         if (ruleUID == null) {
-            logger.warn("Preventive Maintenance: Ignored runNow request with null ruleUID.");
+            logger.warn("Ignored runNow request with null ruleUID.");
             return returnContext;
         }
 
