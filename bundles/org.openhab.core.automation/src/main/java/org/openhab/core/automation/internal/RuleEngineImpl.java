@@ -32,7 +32,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Action;
@@ -1172,7 +1171,6 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
     @Override
     public Map<String, @Nullable Object> runNow(String ruleUID, boolean considerConditions,
             @Nullable Map<String, Object> context) {
-
         Map<String, @Nullable Object> returnContext = new HashMap<>();
 
         // Validate input to prevent NullPointerException in ConcurrentHashMap
@@ -1321,7 +1319,7 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
                 } catch (Throwable t) {
                     String errMessage = "Failed to compile condition: " + condition.getId() + "(" + t.getMessage()
                             + ")";
-                    throw new RuntimeException(errMessage, t);
+                    throw new IllegalStateException(errMessage, t);
                 }
             }
         }
@@ -1385,7 +1383,7 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
                     aHandler.compile();
                 } catch (Throwable t) {
                     String errMessage = "Failed to compile action: " + action.getId() + "(" + t.getMessage() + ")";
-                    throw new RuntimeException(errMessage, t);
+                    throw new IllegalStateException(errMessage, t);
                 }
             }
         }
@@ -1422,7 +1420,7 @@ public class RuleEngineImpl implements RuleManager, RegistryChangeListener<Modul
                     String errMessage = "Failed to execute action: " + action.getId() + "(" + t.getMessage() + ")";
                     if (stopOnFirstFail) {
                         logger.debug("Action {}-{} threw an exception: ", ruleUID, action.getId(), t);
-                        throw new RuntimeException(errMessage, t);
+                        throw new IllegalStateException(errMessage, t);
                     } else {
                         logger.warn(errMessage, t);
                     }

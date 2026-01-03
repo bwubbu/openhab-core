@@ -1,3 +1,15 @@
+/*
+ * Copyright (c) 2010-2025 Contributors to the openHAB project
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
 package org.openhab.core.automation.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -18,8 +30,9 @@ import org.openhab.core.storage.StorageService;
 /**
  * Test the {@link RuleEngineImpl}.
  *
- * @author Yoong Jing Yi
+ * @author Yoong Jing Yi - Initial contribution
  */
+@NonNullByDefault
 public class RuleEngineImplTest {
 
     private RuleEngineImpl ruleEngine;
@@ -66,7 +79,7 @@ public class RuleEngineImplTest {
      * the system proactively halts execution to prevent CPU exhaustion.
      */
     @Test
-    public void testCircuitBreaker_PreventiveMaintenance() {
+    public void testCircuitBreakerPreventiveMaintenance() {
         String ruleUID = "loopingRule01";
 
         // Mock TriggerData
