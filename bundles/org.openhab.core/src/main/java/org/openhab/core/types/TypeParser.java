@@ -27,8 +27,7 @@ import org.slf4j.LoggerFactory;
  * This class uses reflection to call the valueOf(String) method on the corresponding type class.
  * Refactored to reduce duplicate code, improve logging, and improve maintainability.
  * </p>
- * 
- * @author Kai Kreuzer - Initial contribution
+ * * @author Kai Kreuzer - Initial contribution
  */
 @NonNullByDefault
 public final class TypeParser {
@@ -44,13 +43,12 @@ public final class TypeParser {
 
     /**
      * Parses a string into a type instance.
-     * 
-     * @param typeName fully qualified type name or simple name like "StringType"
+     * * @param typeName fully qualified type name or simple name like "StringType"
      * @param input string input to parse
      * @return Parsed type or null if parsing fails
      */
     public static @Nullable Type parseType(String typeName, String input) {
-        TypeParser parser = new TypeParser(); 
+        TypeParser parser = new TypeParser();
         try {
             Class<?> stateClass = Class.forName(CORE_LIBRARY_PACKAGE + typeName);
             return parser.invokeValueOf(stateClass, input, Type.class);
@@ -62,8 +60,7 @@ public final class TypeParser {
 
     /**
      * Parses a string into a State instance using a list of possible state types.
-     * 
-     * @param types List of possible State classes
+     * * @param types List of possible State classes
      * @param s Input string
      * @return First matching State instance or null
      */
@@ -73,8 +70,7 @@ public final class TypeParser {
 
     /**
      * Parses a string into a Command instance using a list of possible command types.
-     * 
-     * @param types List of possible Command classes
+     * * @param types List of possible Command classes
      * @param s Input string
      * @return First matching Command instance or null
      */
@@ -99,8 +95,7 @@ public final class TypeParser {
 
     /**
      * Invokes the static valueOf(String) method on the given class.
-     * 
-     * @param <T> Expected return type
+     * * @param <T> Expected return type
      * @param typeClass Class to invoke valueOf on
      * @param input Input string
      * @param expectedClassType Expected class type
