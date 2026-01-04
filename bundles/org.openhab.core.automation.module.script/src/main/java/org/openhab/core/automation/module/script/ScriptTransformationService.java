@@ -77,7 +77,7 @@ public class ScriptTransformationService implements TransformationService, Scrip
 
     private static final Pattern INLINE_SCRIPT_CONFIG_PATTERN = Pattern.compile("\\|(?<inlineScript>.+)");
 
-    private static final Pattern SCRIPT_CONFIG_PATTERN = Pattern.compile("(?<scriptUid>.+?)(\\?(?<params>.*?))?");
+    private static final Pattern SCRIPT_CONFIG_PATTERN = Pattern.compile("(?<scriptUid>[^?]+)(?:\\?(?<params>.*))?");
 
     private final Logger logger = LoggerFactory.getLogger(ScriptTransformationService.class);
 
@@ -90,12 +90,15 @@ public class ScriptTransformationService implements TransformationService, Scrip
     private final ScriptEngineManager scriptEngineManager;
     private final ConfigDescriptionRegistry configDescRegistry;
 
+    private static final int MAX_SCRIPT_LENGTH = 200_000;
+    private static final int MAX_INPUT_LENGTH = 200_000;
+
     @Activate
     public ScriptTransformationService(@Reference TransformationRegistry transformationRegistry,
             @Reference ConfigDescriptionRegistry configDescRegistry, @Reference ScriptEngineManager scriptEngineManager,
             Map<String, Object> config) {
-        String scriptType = ConfigParser.valueAs(config.get(SCRIPT_TYPE_PROPERTY_NAME), String.class);
-        if (scriptType == null) {
+        String configuredScriptType = ConfigParser.valueAs(config.get(SCRIPT_TYPE_PROPERTY_NAME), String.class);
+        if (configuredScriptType == null) {
             throw new IllegalStateException(
                     "'" + SCRIPT_TYPE_PROPERTY_NAME + "' must not be null in service configuration");
         }
@@ -103,7 +106,7 @@ public class ScriptTransformationService implements TransformationService, Scrip
         this.transformationRegistry = transformationRegistry;
         this.configDescRegistry = configDescRegistry;
         this.scriptEngineManager = scriptEngineManager;
-        this.scriptType = scriptType;
+        this.scriptType = configuredScriptType;
         this.profileConfigUri = URI.create(PROFILE_CONFIG_URI_PREFIX + scriptType.toUpperCase());
         transformationRegistry.addRegistryChangeListener(this);
     }
@@ -118,123 +121,197 @@ public class ScriptTransformationService implements TransformationService, Scrip
 
     @Override
     public @Nullable String transform(String function, String source) throws TransformationException {
-        String scriptUid;
-        String inlineScript = null;
-        String params = null;
-
-        Matcher configMatcher = INLINE_SCRIPT_CONFIG_PATTERN.matcher(function);
-        if (configMatcher.matches()) {
-            inlineScript = configMatcher.group("inlineScript");
-            // prefix with | to avoid clashing with a real filename
-            scriptUid = "|" + Integer.toString(inlineScript.hashCode());
-        } else {
-            configMatcher = SCRIPT_CONFIG_PATTERN.matcher(function);
-            if (!configMatcher.matches()) {
-                throw new TransformationException("Invalid syntax for the script transformation: '" + function + "'");
-            }
-            scriptUid = configMatcher.group("scriptUid");
-            params = configMatcher.group("params");
-        }
+        ParsedConfig parsed = parseFunction(function);
 
         ScriptRecord scriptRecord = Objects
-                .requireNonNull(scriptCache.computeIfAbsent(scriptUid, k -> new ScriptRecord()));
-        scriptRecord.lock.lock();
+                .requireNonNull(scriptCache.computeIfAbsent(parsed.scriptUid, k -> new ScriptRecord()));
+
+        scriptRecord.lock().lock();
         try {
-            if (scriptRecord.script.isBlank()) {
-                if (inlineScript != null) {
-                    scriptRecord.script = inlineScript;
-                } else {
-                    // get script from transformation registry
-                    Transformation transformation = transformationRegistry.get(scriptUid);
-                    if (transformation != null) {
-                        scriptRecord.script = transformation.getConfiguration().getOrDefault(Transformation.FUNCTION,
-                                "");
-                    }
-                }
-                if (scriptRecord.script.isBlank()) {
-                    throw new TransformationException("Could not get script for UID '" + scriptUid + "'.");
-                }
-                scriptCache.put(scriptUid, scriptRecord);
-            }
+            ensureScriptLoaded(parsed, scriptRecord);
+            ensureScriptTypeSupported(parsed.scriptUid);
+            ScriptEngineContainer container = getOrCreateEngineContainer(parsed.scriptUid, function, scriptRecord);
 
-            if (!scriptEngineManager.isSupported(scriptType)) {
-                // language has been removed, clear container and compiled scripts if found
-                clearCache(scriptUid);
-                throw new TransformationException(
-                        "Script type '" + scriptType + "' is not supported by any available script engine.");
-            }
-
-            if (scriptRecord.scriptEngineContainer == null) {
-                scriptRecord.scriptEngineContainer = scriptEngineManager.createScriptEngine(scriptType,
-                        OPENHAB_TRANSFORMATION_SCRIPT + scriptUid);
-            }
-            ScriptEngineContainer scriptEngineContainer = scriptRecord.scriptEngineContainer;
-
-            if (scriptEngineContainer == null) {
-                throw new TransformationException("Failed to create script engine container for '" + function + "'.");
-            }
             try {
-                CompiledScript compiledScript = scriptRecord.compiledScript;
-
-                ScriptEngine engine = compiledScript != null ? compiledScript.getEngine()
-                        : scriptEngineContainer.getScriptEngine();
-                ScriptContext executionContext = engine.getContext();
-                executionContext.setAttribute("input", source, ScriptContext.ENGINE_SCOPE);
-                ArrayList<String> injectedParams = null;
-
-                if (params != null) {
-                    injectedParams = new ArrayList<>();
-                    for (String param : params.split("&")) {
-                        String[] splitString = param.split("=");
-                        if (splitString.length != 2) {
-                            logger.warn(
-                                    "Parameter '{}' does not consist of two parts for configuration UID {}, skipping.",
-                                    param, scriptUid);
-                        } else {
-                            param = URLDecoder.decode(splitString[0], StandardCharsets.UTF_8);
-                            String value = URLDecoder.decode(splitString[1], StandardCharsets.UTF_8);
-                            executionContext.setAttribute(param, value, ScriptContext.ENGINE_SCOPE);
-                            injectedParams.add(param);
-                        }
-                    }
-                }
-
-                // compile the script here _after_ setting context attributes, so that the script engine
-                // can bind the attributes as variables during compilation. This primarily affects jruby.
-                if (compiledScript == null
-                        && scriptEngineContainer.getScriptEngine() instanceof Compilable scriptEngine) {
-                    // no compiled script available but compiling is supported
-                    compiledScript = scriptEngine.compile(scriptRecord.script);
-                    scriptRecord.compiledScript = compiledScript;
-                }
-
-                try {
-                    Object result = compiledScript != null ? compiledScript.eval() : engine.eval(scriptRecord.script);
-                    return result == null ? null : result.toString();
-                } finally {
-                    if (injectedParams != null) {
-                        injectedParams
-                                .forEach(param -> executionContext.removeAttribute(param, ScriptContext.ENGINE_SCOPE));
-                    }
-                }
-            } catch (ScriptException e) {
-                throw new TransformationException("Failed to execute script.", e);
+                return evaluateScript(parsed, function, source, scriptRecord, container);
             } catch (IllegalStateException e) {
                 // ISE thrown by JS Scripting if script engine already closed
                 if ("The Context is already closed.".equals(e.getMessage())) {
                     logger.warn(
                             "Script engine context {} is already closed, this should not happen. Recreating script engine.",
-                            scriptUid);
-                    scriptCache.remove(scriptUid);
+                            parsed.scriptUid);
+                    scriptCache.remove(parsed.scriptUid);
                     return transform(function, source);
-                } else {
-                    // rethrow
-                    throw e;
                 }
+                throw e;
             }
         } finally {
-            scriptRecord.lock.unlock();
+            scriptRecord.lock().unlock();
         }
+    }
+
+    private ParsedConfig parseFunction(String function) throws TransformationException {
+        Matcher inlineMatcher = INLINE_SCRIPT_CONFIG_PATTERN.matcher(function);
+        if (inlineMatcher.matches()) {
+            String inlineScript = inlineMatcher.group("inlineScript");
+
+            if (inlineScript != null && inlineScript.length() > MAX_SCRIPT_LENGTH) {
+                throw new TransformationException("Inline script is too large and exceeds safe execution limits.");
+            }
+
+            // prefix with | to avoid clashing with a real filename
+            String scriptUid = "|" + Integer.toString(inlineScript.hashCode());
+            return new ParsedConfig(scriptUid, inlineScript, null);
+        }
+
+        Matcher configMatcher = SCRIPT_CONFIG_PATTERN.matcher(function);
+        if (!configMatcher.matches()) {
+            throw new TransformationException("Invalid syntax for the script transformation: '" + function + "'");
+        }
+
+        String scriptUid = configMatcher.group("scriptUid");
+        String params = configMatcher.group("params");
+        return new ParsedConfig(scriptUid, null, params);
+    }
+
+    private void ensureScriptLoaded(ParsedConfig parsed, ScriptRecord scriptRecord) throws TransformationException {
+        if (!scriptRecord.script().isBlank()) {
+            return;
+        }
+
+        String loadedScript = "";
+        if (parsed.inlineScript != null) {
+            loadedScript = parsed.inlineScript;
+        } else {
+            Transformation transformation = transformationRegistry.get(parsed.scriptUid);
+            if (transformation != null) {
+                loadedScript = transformation.getConfiguration().getOrDefault(Transformation.FUNCTION, "");
+            }
+        }
+
+        if (loadedScript.isBlank()) {
+            throw new TransformationException("Could not get script for UID '" + parsed.scriptUid + "'.");
+        }
+
+        if (loadedScript.length() > MAX_SCRIPT_LENGTH) {
+            throw new TransformationException("Script size exceeds safe execution limits.");
+        }
+
+        scriptRecord.setScript(loadedScript);
+        scriptCache.put(parsed.scriptUid, scriptRecord);
+    }
+
+    private void ensureScriptTypeSupported(String scriptUid) throws TransformationException {
+        if (scriptEngineManager.isSupported(scriptType)) {
+            return;
+        }
+
+        // language has been removed, clear container and compiled scripts if found
+        clearCache(scriptUid);
+        throw new TransformationException(
+                "Script type '" + scriptType + "' is not supported by any available script engine.");
+    }
+
+    private ScriptEngineContainer getOrCreateEngineContainer(String scriptUid, String function, ScriptRecord scriptRecord)
+            throws TransformationException {
+
+        if (scriptRecord.scriptEngineContainer() == null) {
+            scriptRecord.setScriptEngineContainer(
+                    scriptEngineManager.createScriptEngine(scriptType, OPENHAB_TRANSFORMATION_SCRIPT + scriptUid));
+        }
+
+        ScriptEngineContainer container = scriptRecord.scriptEngineContainer();
+        if (container == null) {
+            throw new TransformationException("Failed to create script engine container for '" + function + "'.");
+        }
+        return container;
+    }
+
+    private @Nullable String evaluateScript(ParsedConfig parsed, String function, String source, ScriptRecord scriptRecord,
+            ScriptEngineContainer scriptEngineContainer) throws TransformationException {
+
+        try {
+            CompiledScript compiledScript = scriptRecord.compiledScript();
+
+            ScriptEngine engine = compiledScript != null ? compiledScript.getEngine()
+                    : scriptEngineContainer.getScriptEngine();
+            ScriptContext executionContext = engine.getContext();
+
+            validateInputSize(source);
+
+            // Make input available to the script engine
+            executionContext.setAttribute("input", source, ScriptContext.ENGINE_SCOPE);
+
+            ArrayList<String> injectedParams = injectParams(parsed.params, parsed.scriptUid, executionContext);
+
+            // compile the script here _after_ setting context attributes, so that the script engine
+            // can bind the attributes as variables during compilation. This primarily affects jruby.
+            compiledScript = compileIfPossible(compiledScript, scriptRecord, scriptEngineContainer);
+
+            try {
+                Object result = compiledScript != null ? compiledScript.eval() : engine.eval(scriptRecord.script());
+                return result == null ? null : result.toString();
+            } finally {
+                removeInjectedParams(injectedParams, executionContext);
+            }
+        } catch (ScriptException e) {
+            throw new TransformationException("Failed to execute script.", e);
+        }
+    }
+
+    private void validateInputSize(@Nullable String source) throws TransformationException {
+        if (source != null && source.length() > MAX_INPUT_LENGTH) {
+            throw new TransformationException("Input payload is too large for script transformation.");
+        }
+    }
+
+    private @Nullable ArrayList<String> injectParams(@Nullable String params, String scriptUid,
+            ScriptContext executionContext) {
+
+        if (params == null) {
+            return null;
+        }
+
+        ArrayList<String> injectedParams = new ArrayList<>();
+        for (String param : params.split("&")) {
+            String[] splitString = param.split("=");
+            if (splitString.length != 2) {
+                logger.warn("Parameter '{}' does not consist of two parts for configuration UID {}, skipping.", param,
+                        scriptUid);
+                continue;
+            }
+
+            String key = URLDecoder.decode(splitString[0], StandardCharsets.UTF_8);
+            String value = URLDecoder.decode(splitString[1], StandardCharsets.UTF_8);
+
+            executionContext.setAttribute(key, value, ScriptContext.ENGINE_SCOPE);
+            injectedParams.add(key);
+        }
+        return injectedParams;
+    }
+
+    private void removeInjectedParams(@Nullable ArrayList<String> injectedParams, ScriptContext executionContext) {
+        if (injectedParams == null) {
+            return;
+        }
+        injectedParams.forEach(param -> executionContext.removeAttribute(param, ScriptContext.ENGINE_SCOPE));
+    }
+
+    private @Nullable CompiledScript compileIfPossible(@Nullable CompiledScript compiledScript, ScriptRecord scriptRecord,
+            ScriptEngineContainer scriptEngineContainer) throws ScriptException {
+
+        if (compiledScript != null) {
+            return compiledScript;
+        }
+
+        ScriptEngine engine = scriptEngineContainer.getScriptEngine();
+        if (engine instanceof Compilable compilable) {
+            CompiledScript newCompiled = compilable.compile(scriptRecord.script());
+            scriptRecord.setCompiledScript(newCompiled);
+            return newCompiled;
+        }
+
+        return null;
     }
 
     @Override
@@ -317,11 +394,52 @@ public class ScriptTransformationService implements TransformationService, Scrip
         scriptRecord.compiledScript = null;
     }
 
-    private static class ScriptRecord {
-        public String script = "";
-        public @Nullable ScriptEngineContainer scriptEngineContainer;
-        public @Nullable CompiledScript compiledScript;
+    private static final class ParsedConfig {
+        final String scriptUid;
+        final @Nullable String inlineScript;
+        final @Nullable String params;
 
-        public final Lock lock = new ReentrantLock();
+        ParsedConfig(String scriptUid, @Nullable String inlineScript, @Nullable String params) {
+            this.scriptUid = scriptUid;
+            this.inlineScript = inlineScript;
+            this.params = params;
+        }
+    }
+
+
+    private static final class ScriptRecord {
+        // SonarLint java:S1104: do not expose mutable fields publicly
+        private String script = "";
+        private @Nullable ScriptEngineContainer scriptEngineContainer;
+        private @Nullable CompiledScript compiledScript;
+        private final Lock lock = new ReentrantLock();
+
+        String script() {
+            return script;
+        }
+
+        void setScript(String script) {
+            this.script = script;
+        }
+
+        @Nullable ScriptEngineContainer scriptEngineContainer() {
+            return scriptEngineContainer;
+        }
+
+        void setScriptEngineContainer(@Nullable ScriptEngineContainer scriptEngineContainer) {
+            this.scriptEngineContainer = scriptEngineContainer;
+        }
+
+        @Nullable CompiledScript compiledScript() {
+            return compiledScript;
+        }
+
+        void setCompiledScript(@Nullable CompiledScript compiledScript) {
+            this.compiledScript = compiledScript;
+        }
+
+        Lock lock() {
+            return lock;
+        }
     }
 }
