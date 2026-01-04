@@ -212,8 +212,8 @@ public class ScriptTransformationService implements TransformationService, Scrip
                 "Script type '" + scriptType + "' is not supported by any available script engine.");
     }
 
-    private ScriptEngineContainer getOrCreateEngineContainer(String scriptUid, String function, ScriptRecord scriptRecord)
-            throws TransformationException {
+    private ScriptEngineContainer getOrCreateEngineContainer(String scriptUid, String function,
+            ScriptRecord scriptRecord) throws TransformationException {
 
         if (scriptRecord.scriptEngineContainer() == null) {
             scriptRecord.setScriptEngineContainer(
@@ -227,8 +227,8 @@ public class ScriptTransformationService implements TransformationService, Scrip
         return container;
     }
 
-    private @Nullable String evaluateScript(ParsedConfig parsed, String function, String source, ScriptRecord scriptRecord,
-            ScriptEngineContainer scriptEngineContainer) throws TransformationException {
+    private @Nullable String evaluateScript(ParsedConfig parsed, String function, String source,
+            ScriptRecord scriptRecord, ScriptEngineContainer scriptEngineContainer) throws TransformationException {
 
         try {
             CompiledScript compiledScript = scriptRecord.compiledScript();
@@ -297,8 +297,8 @@ public class ScriptTransformationService implements TransformationService, Scrip
         injectedParams.forEach(param -> executionContext.removeAttribute(param, ScriptContext.ENGINE_SCOPE));
     }
 
-    private @Nullable CompiledScript compileIfPossible(@Nullable CompiledScript compiledScript, ScriptRecord scriptRecord,
-            ScriptEngineContainer scriptEngineContainer) throws ScriptException {
+    private @Nullable CompiledScript compileIfPossible(@Nullable CompiledScript compiledScript,
+            ScriptRecord scriptRecord, ScriptEngineContainer scriptEngineContainer) throws ScriptException {
 
         if (compiledScript != null) {
             return compiledScript;
@@ -406,7 +406,6 @@ public class ScriptTransformationService implements TransformationService, Scrip
         }
     }
 
-
     private static final class ScriptRecord {
         // SonarLint java:S1104: do not expose mutable fields publicly
         private String script = "";
@@ -422,7 +421,8 @@ public class ScriptTransformationService implements TransformationService, Scrip
             this.script = script;
         }
 
-        @Nullable ScriptEngineContainer scriptEngineContainer() {
+        @Nullable
+        ScriptEngineContainer scriptEngineContainer() {
             return scriptEngineContainer;
         }
 
@@ -430,7 +430,8 @@ public class ScriptTransformationService implements TransformationService, Scrip
             this.scriptEngineContainer = scriptEngineContainer;
         }
 
-        @Nullable CompiledScript compiledScript() {
+        @Nullable
+        CompiledScript compiledScript() {
             return compiledScript;
         }
 
