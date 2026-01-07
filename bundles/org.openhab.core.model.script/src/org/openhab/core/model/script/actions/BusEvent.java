@@ -43,6 +43,10 @@ import org.slf4j.LoggerFactory;
  */
 public class BusEvent {
 
+    private BusEvent() {
+        // Prevent instantiation
+    }
+
     /**
      * Sends a command for a specified item to the event bus.
      *
@@ -116,7 +120,7 @@ public class BusEvent {
         }
         return null;
     }
-    
+
     /**
      * Sends a command for a specified item only if its current state is
      * different from the provided value.
@@ -132,8 +136,7 @@ public class BusEvent {
      */
     public static Object sendIfChanged(String itemName, String commandString) {
         if (itemName == null || itemName.isEmpty()) {
-            LoggerFactory.getLogger(BusEvent.class)
-                    .warn("sendIfChanged called with empty itemName - skipping");
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged called with empty itemName - skipping");
             return null;
         }
         if (commandString == null) {
@@ -153,8 +156,8 @@ public class BusEvent {
             Item item = registry.getItem(itemName);
             return sendIfChanged(item, commandString);
         } catch (ItemNotFoundException e) {
-            LoggerFactory.getLogger(BusEvent.class)
-                    .warn("sendIfChanged: item '{}' does not exist - skipping", itemName);
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged: item '{}' does not exist - skipping",
+                    itemName);
             return null;
         }
     }
@@ -170,8 +173,8 @@ public class BusEvent {
      */
     public static Object sendIfChanged(String itemName, Number number) {
         if (number == null) {
-            LoggerFactory.getLogger(BusEvent.class)
-                    .warn("sendIfChanged for item '{}' with null number - skipping", itemName);
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged for item '{}' with null number - skipping",
+                    itemName);
             return null;
         }
         return sendIfChanged(itemName, number.toString());
@@ -190,8 +193,7 @@ public class BusEvent {
      */
     public static Object sendIfChanged(Item item, String commandString) {
         if (item == null) {
-            LoggerFactory.getLogger(BusEvent.class)
-                    .warn("sendIfChanged called with null Item - skipping");
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged called with null Item - skipping");
             return null;
         }
         if (commandString == null) {
@@ -203,9 +205,8 @@ public class BusEvent {
         State current = item.getState();
         if (current != null && commandString.equals(current.toString())) {
             // State already matches the desired command, skip sending
-            LoggerFactory.getLogger(BusEvent.class).debug(
-                    "sendIfChanged: item '{}' already in state '{}', skipping command",
-                    item.getName(), current);
+            LoggerFactory.getLogger(BusEvent.class)
+                    .debug("sendIfChanged: item '{}' already in state '{}', skipping command", item.getName(), current);
             return null;
         }
 
@@ -229,8 +230,8 @@ public class BusEvent {
             return null;
         }
         if (number == null) {
-            LoggerFactory.getLogger(BusEvent.class)
-                    .warn("sendIfChanged for item '{}' with null number - skipping", item.getName());
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged for item '{}' with null number - skipping",
+                    item.getName());
             return null;
         }
         return sendIfChanged(item, number.toString());
