@@ -47,13 +47,15 @@ import org.slf4j.LoggerFactory;
  * under the 'transform' folder within the configuration path. To organize the various
  * transformations one might use subfolders.
  *
- * @deprecated use the {@link TransformationRegistry} instead
+ * @deprecated Use {@link TransformationRegistry} instead. This class is kept for backwards compatibility and is
+ *             planned for removal in a future release.
  * 
  * @author Gaël L'hopital - Initial contribution
  * @author Kai Kreuzer - File caching mechanism
  * @author Markus Rathgeb - Add locale provider support
  */
 @NonNullByDefault
+@Deprecated(forRemoval = true)
 public abstract class AbstractFileTransformationService<T> implements TransformationService {
 
     private static final char EXTENSION_SEPARATOR = '.';
@@ -88,6 +90,7 @@ public abstract class AbstractFileTransformationService<T> implements Transforma
 
         @Override
         public void modifiedService(@Nullable ServiceReference<LocaleProvider> reference, LocaleProvider service) {
+            // Intentionally left empty: LocaleProvider updates are handled by (re)binding on add/remove.
         }
 
         @Override

@@ -13,10 +13,7 @@
 package org.openhab.core.io.rest;
 
 import java.io.BufferedWriter;
-import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
 
 import javax.ws.rs.WebApplicationException;
@@ -128,7 +125,7 @@ public class JSONResponse {
             // JSONify the Exception
             JsonObject exceptionJson = new JsonObject();
             exceptionJson.addProperty("class", ex.getClass().getName());
-            exceptionJson.addProperty("message", ex.getMessage());
+            exceptionJson.addProperty(JSON_KEY_ERROR_MESSAGE, ex.getMessage());
             exceptionJson.addProperty("localized-message", ex.getLocalizedMessage());
             exceptionJson.addProperty("cause", null != ex.getCause() ? ex.getCause().getClass().getName() : null);
             errorJson.add("exception", exceptionJson);
@@ -151,7 +148,7 @@ public class JSONResponse {
             return rp.build();
         }
 
-        rp.entity((StreamingOutput) (target) -> {
+        rp.entity((StreamingOutput) target -> {
             // target must not be closed, see javadoc of javax.ws.rs.ext.MessageBodyWriter
             JsonWriter jsonWriter = new JsonWriter(
                     new BufferedWriter(new OutputStreamWriter(target, StandardCharsets.UTF_8)));
@@ -161,18 +158,6 @@ public class JSONResponse {
         });
 
         return rp.build();
-    }
-
-    /**
-     * A piped input stream that is marked to produce JSON string.
-     *
-     * @author Markus Rathgeb - Initial contribution
-     */
-    private static class PipedJSONInputStream extends PipedInputStream implements JSONInputStream {
-
-        public PipedJSONInputStream(PipedOutputStream src) throws IOException {
-            super(src);
-        }
     }
 
     /**

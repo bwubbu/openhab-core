@@ -179,9 +179,9 @@ public class VoiceManagerImpl implements VoiceManager, ConfigOptionProvider, Dia
     protected void deactivate() {
         dialogProcessors.values().forEach(DialogProcessor::stop);
         dialogProcessors.clear();
-        ScheduledFuture<?> dialogRegistrationFuture = this.dialogRegistrationFuture;
-        if (dialogRegistrationFuture != null) {
-            dialogRegistrationFuture.cancel(true);
+        ScheduledFuture<?> registrationFuture = this.dialogRegistrationFuture;
+        if (registrationFuture != null) {
+            registrationFuture.cancel(true);
             this.dialogRegistrationFuture = null;
         }
     }
@@ -374,8 +374,10 @@ public class VoiceManagerImpl implements VoiceManager, ConfigOptionProvider, Dia
         try {
             return transcriptionResult.get(60, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            logger.warn("InterruptedException waiting for transcription: {}", e.getMessage());
+            Thread.currentThread().interrupt();
+            logger.warn("Interrupted while waiting for transcription: {}", e.getMessage());
             sttServiceHandle.abort();
+            return "";
         } catch (ExecutionException e) {
             logger.warn("ExecutionException running transcription: {}", e.getCause().getMessage());
         } catch (TimeoutException e) {
@@ -1020,6 +1022,9 @@ public class VoiceManagerImpl implements VoiceManager, ConfigOptionProvider, Dia
                                             String.format("%s - %s - %s", getTTS(v).getLabel(nullSafeLocale),
                                                     v.getLocale().getDisplayName(nullSafeLocale), v.getLabel())))
                             .toList();
+                default:
+                    logger.debug("No parameter options available for param '{}'", param);
+                    return null;
             }
         }
         return null;
