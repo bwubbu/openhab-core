@@ -23,10 +23,11 @@ import org.openhab.core.library.unit.Units;
 import org.openhab.core.thing.profiles.ProfileCallback;
 import org.openhab.core.thing.profiles.ProfileContext;
 import org.openhab.core.thing.profiles.ProfileTypeUID;
-import org.openhab.core.thing.profiles.StateProfile;
 import org.openhab.core.thing.profiles.SystemProfiles;
+import org.openhab.core.thing.profiles.TimeSeriesProfile;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
+import org.openhab.core.types.TimeSeries;
 import org.openhab.core.types.Type;
 import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
@@ -36,11 +37,15 @@ import tech.units.indriya.AbstractUnit;
 
 /***
  * This is the default implementation for a {@link SystemHysteresisStateProfile}.
+ * <p>
+ * This profile also supports {@link TimeSeries} by applying the hysteresis transformation to each entry
+ * in the time series. The hysteresis logic is applied sequentially to maintain the threshold behavior
+ * across the time series.
  *
  * @author Christoph Weitkamp - Initial contribution
  */
 @NonNullByDefault
-public class SystemHysteresisStateProfile implements StateProfile {
+public class SystemHysteresisStateProfile implements TimeSeriesProfile {
 
     static final String LOWER_PARAM = "lower";
     private static final String UPPER_PARAM = "upper";
@@ -129,6 +134,21 @@ public class SystemHysteresisStateProfile implements StateProfile {
         }
     }
 
+    @Override
+    public void onTimeSeriesFromHandler(TimeSeries timeSeries) {
+        TimeSeries transformedTimeSeries = new TimeSeries(timeSeries.getPolicy());
+        // Use array to hold mutable reference for lambda
+        Type[] localPreviousType = { UnDefType.UNDEF };
+        timeSeries.getStates().forEach(entry -> {
+            Type mappedValue = mapValueForTimeSeries(entry.state(), localPreviousType[0]);
+            if (mappedValue instanceof State state) {
+                transformedTimeSeries.add(entry.timestamp(), state);
+                localPreviousType[0] = mappedValue;
+            }
+        });
+        callback.sendTimeSeries(transformedTimeSeries);
+    }
+
     private Type mapValue(Type value) {
         if (value instanceof QuantityType qtState) {
             final QuantityType<?> finalLower;
@@ -167,5 +187,48 @@ public class SystemHysteresisStateProfile implements StateProfile {
             return high;
         }
         return previousType;
+    }
+
+    /**
+     * Maps a value for TimeSeries processing, using the provided previousType instead of the instance variable.
+     * This allows processing TimeSeries entries sequentially while maintaining hysteresis behavior.
+     */
+    private Type mapValueForTimeSeries(Type value, Type currentPreviousType) {
+        if (value instanceof QuantityType qtState) {
+            final QuantityType<?> finalLower;
+            final QuantityType<?> finalUpper;
+            if (Units.ONE.equals(lower.getUnit()) && Units.ONE.equals(upper.getUnit())) {
+                if (!Units.ONE.equals(qtState.getUnit())) {
+                    logger.warn(
+                            "Received a QuantityType '{}' with unit, but the boundaries are defined as a plain number without units (lower={}, upper={}), please consider adding units to them.",
+                            value, lower, upper);
+                }
+                finalLower = new QuantityType<>(lower.toBigDecimal(), qtState.getUnit());
+                finalUpper = new QuantityType<>(upper.toBigDecimal(), qtState.getUnit());
+            } else {
+                finalLower = lower.toInvertibleUnit(qtState.getUnit());
+                finalUpper = upper.toInvertibleUnit(qtState.getUnit());
+                if (finalLower == null || finalUpper == null) {
+                    logger.warn(
+                            "Cannot compare state '{}' to boundaries because units (lower={}, upper={}) do not match.",
+                            qtState, lower, upper);
+                    return currentPreviousType;
+                }
+            }
+            return mapValue(finalLower.doubleValue(), finalUpper.doubleValue(), qtState.doubleValue(),
+                    currentPreviousType);
+        } else if (value instanceof DecimalType type) {
+            return mapValue(lower.doubleValue(), upper.doubleValue(), type.doubleValue(), currentPreviousType);
+        }
+        return currentPreviousType;
+    }
+
+    private Type mapValue(double lower, double upper, double value, Type currentPreviousType) {
+        if (value <= lower) {
+            return low;
+        } else if (value >= upper) {
+            return high;
+        }
+        return currentPreviousType;
     }
 }
