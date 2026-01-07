@@ -168,11 +168,12 @@ public abstract class MarketplaceBundleInstaller {
 
     private String addonIdFromPath(Path path) {
         String pathName = UIDUtils.decode(path.getFileName().toString());
-        return pathName.contains(":") ? pathName : "marketplace:" + pathName;
+        return pathName.contains(":") ? pathName : MarketplaceConstants.MARKETPLACE_PREFIX + pathName;
     }
 
     private Path getAddonCacheDirectory(String addonId) {
-        String dir = addonId.startsWith("marketplace:") ? addonId.replace("marketplace:", "")
+        String dir = addonId.startsWith(MarketplaceConstants.MARKETPLACE_PREFIX)
+                ? addonId.replace(MarketplaceConstants.MARKETPLACE_PREFIX, "")
                 : UIDUtils.encode(addonId);
         return BUNDLE_CACHE_PATH.resolve(dir);
     }

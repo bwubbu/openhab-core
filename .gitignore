@@ -22,3 +22,11 @@ Californium.properties
 
 generated/
 userdata/
+bundleversion_fix_impact_analysis.md
+call_graph_analysis.md
+maintenance_activity_report.md
+maintenance_issues_report.md
+marketplace_analysis.md
+marketplace_maintenance_activity.md
+timeseries_transformation_impact_analysis.md
+todo_analysis_draft.md

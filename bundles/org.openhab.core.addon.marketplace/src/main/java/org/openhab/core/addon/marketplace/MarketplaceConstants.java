@@ -28,4 +28,5 @@ public class MarketplaceConstants {
     public static final String KAR_DOWNLOAD_URL_PROPERTY = "kar_download_url";
     public static final String JSON_DOWNLOAD_URL_PROPERTY = "json_download_url";
     public static final String YAML_DOWNLOAD_URL_PROPERTY = "yaml_download_url";
+    public static final String MARKETPLACE_PREFIX = "marketplace:";
 }

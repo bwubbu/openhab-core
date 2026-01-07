@@ -260,7 +260,9 @@ public class FeatureInstaller implements ConfigurationListener {
         while (!paxCfgUpdated && counter++ < 50) {
             try {
                 Thread.sleep(100);
-            } catch (InterruptedException ignored) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
             }
         }
         logger.warn("Waited for 5s to receive config update, but configuration was not updated. Proceeding anyway.");
