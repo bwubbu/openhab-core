@@ -41,13 +41,13 @@ public class ExpiringCache<V> {
     /**
      * Create a new instance.
      *
-     * @param expiry the duration for how long the value stays valid
+     * @param expiry the duration for how long the value stays valid. 0 disables automatic expiration.
      * @param action the action to retrieve/calculate the value
-     * @throws IllegalArgumentException For an expire {@code value <=0}.
+     * @throws IllegalArgumentException for an expiry {@code value < 0}.
      */
     public ExpiringCache(Duration expiry, Supplier<@Nullable V> action) {
-        if (expiry.isNegative() || expiry.isZero()) {
-            throw new IllegalArgumentException("Cache expire time must be greater than 0");
+        if (expiry.isNegative()) {
+            throw new IllegalArgumentException("Cache expire time must be greater than or equal to 0");
         }
         this.expiry = expiry.toNanos();
         this.action = action;
@@ -112,10 +112,15 @@ public class ExpiringCache<V> {
      * @return true if the value is expired
      */
     public boolean isExpired() {
+        // expiry == 0 disables automatic expiration
+        if (expiry == 0) {
+            return false;
+        }
         return expiresAt < System.nanoTime();
     }
 
     private long calcExpiresAt() {
-        return System.nanoTime() + expiry;
+        // expiry == 0 disables automatic expiration
+        return expiry == 0 ? Long.MAX_VALUE : System.nanoTime() + expiry;
     }
 }
