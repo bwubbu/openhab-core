@@ -247,8 +247,19 @@ public class AudioServlet extends HttpServlet implements AudioHTTPServer {
         }
     }
 
+    /**
+     * Serves the given {@link AudioStream} via HTTP with a default timeout.
+     * Input validation: stream must not be {@code null}.
+     * 
+     * @param stream the audio stream to serve (must not be {@code null})
+     * @return the relative URL to access the served stream
+     * @throws IllegalArgumentException if {@code stream} is {@code null}
+     */
     @Override
     public String serve(AudioStream stream) {
+        if (stream == null) {
+            throw new IllegalArgumentException("AudioStream must not be null");
+        }
         try {
             // In case the stream is never played, we cannot wait indefinitely before executing the callback.
             // so we set a timeout (even if this is a one time stream).
@@ -259,8 +270,23 @@ public class AudioServlet extends HttpServlet implements AudioHTTPServer {
         }
     }
 
+    /**
+     * Serves the given {@link AudioStream} via HTTP with a specified timeout.
+     * Input validation: stream must not be {@code null}, seconds must be positive.
+     * 
+     * @param stream the audio stream to serve (must not be {@code null})
+     * @param seconds the timeout in seconds (must be positive)
+     * @return the relative URL to access the served stream
+     * @throws IllegalArgumentException if {@code stream} is {@code null} or {@code seconds} is not positive
+     */
     @Override
     public String serve(AudioStream stream, int seconds) {
+        if (stream == null) {
+            throw new IllegalArgumentException("AudioStream must not be null");
+        }
+        if (seconds <= 0) {
+            throw new IllegalArgumentException("Timeout seconds must be positive");
+        }
         try {
             return serve(stream, seconds, true).url();
         } catch (IOException e) {
@@ -269,8 +295,25 @@ public class AudioServlet extends HttpServlet implements AudioHTTPServer {
         }
     }
 
+    /**
+     * Serves the given {@link AudioStream} via HTTP with a specified timeout and multi-time stream option.
+     * Input validation: originalStream must not be {@code null}, seconds must be positive.
+     * 
+     * @param originalStream the audio stream to serve (must not be {@code null})
+     * @param seconds the timeout in seconds (must be positive)
+     * @param multiTimeStream whether the stream can be served multiple times
+     * @return a {@link StreamServed} object representing the served stream
+     * @throws IllegalArgumentException if {@code originalStream} is {@code null} or {@code seconds} is not positive
+     * @throws IOException if an I/O error occurs
+     */
     @Override
     public StreamServed serve(AudioStream originalStream, int seconds, boolean multiTimeStream) throws IOException {
+        if (originalStream == null) {
+            throw new IllegalArgumentException("AudioStream must not be null");
+        }
+        if (seconds <= 0) {
+            throw new IllegalArgumentException("Timeout seconds must be positive");
+        }
         String streamId = UUID.randomUUID().toString();
         AudioStream audioStream = originalStream;
         if (!(originalStream instanceof ClonableAudioStream) && multiTimeStream) {
