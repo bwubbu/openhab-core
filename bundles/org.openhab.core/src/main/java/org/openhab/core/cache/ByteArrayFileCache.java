@@ -65,6 +65,10 @@ public class ByteArrayFileCache {
      *            disable this functionality.
      */
     public ByteArrayFileCache(String servicePID, Duration expiry) {
+        // a cache instance must be associated with a valid, non-empty service PID.
+        if (servicePID == null || servicePID.isBlank()) {
+            throw new IllegalArgumentException("Service PID must not be null or empty");
+        }
         // possible to-dos:
         // - track and limit folder size
         // - support user specific folder
@@ -75,8 +79,10 @@ public class ByteArrayFileCache {
         }
         logger.debug("Using cache folder '{}'", cacheFolder.getAbsolutePath());
 
+        // same rule, better evidence
         if (expiry.isNegative()) {
-            throw new IllegalArgumentException("Cache expiration time must be greater than or equal to 0");
+            throw new IllegalArgumentException(
+                    "Cache expiration time must be greater than or equal to 0, but was " + expiry);
         }
         this.expiry = expiry;
     }
@@ -89,6 +95,7 @@ public class ByteArrayFileCache {
      * @param content the content for the file to be associated with the specified key
      */
     public void put(String key, byte[] content) {
+        validateKey(key);
         writeFile(getUniqueFile(key), content);
     }
 
@@ -99,6 +106,7 @@ public class ByteArrayFileCache {
      * @param content the content for the file to be associated with the specified key
      */
     public void putIfAbsent(String key, byte[] content) {
+        validateKey(key);
         File fileInCache = getUniqueFile(key);
         if (fileInCache.exists()) {
             logger.debug("File '{}' present in cache", fileInCache.getName());
@@ -118,6 +126,7 @@ public class ByteArrayFileCache {
      * @throws IOException if an I/O error occurs reading the given file
      */
     public byte[] putIfAbsentAndGet(String key, byte[] content) throws IOException {
+        validateKey(key);
         putIfAbsent(key, content);
 
         return get(key);
@@ -145,6 +154,7 @@ public class ByteArrayFileCache {
      * @return true if the cache contains a file for the specified key
      */
     public boolean containsKey(String key) {
+        validateKey(key);
         return getUniqueFile(key).exists();
     }
 
@@ -154,6 +164,7 @@ public class ByteArrayFileCache {
      * @param key the key whose associated file is to be removed
      */
     public void remove(String key) {
+        validateKey(key);
         deleteFile(getUniqueFile(key));
     }
 
@@ -198,6 +209,21 @@ public class ByteArrayFileCache {
     }
 
     /**
+     * Validates the cache key according to the cache usage rules.
+     * <p>
+     * Cache keys must be non-null and non-empty to ensure that file name generation and cache
+     * lookup operations behave consistently and do not result in invalid or ambiguous cache entries.
+     *
+     * @param key the cache key to validate
+     * @throws IllegalArgumentException if the key is null or empty
+     */
+    private void validateKey(String key) {
+        if (key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("Cache key must not be null or empty");
+        }
+    }
+
+    /**
      * Checks if the given {@link File} is expired.
      *
      * @param fileInCache the {@link File}
@@ -218,6 +244,7 @@ public class ByteArrayFileCache {
      * @throws IOException if an I/O error occurs reading the given file
      */
     public byte[] get(String key) throws FileNotFoundException, IOException {
+        validateKey(key);
         return readFile(getUniqueFile(key));
     }
 
