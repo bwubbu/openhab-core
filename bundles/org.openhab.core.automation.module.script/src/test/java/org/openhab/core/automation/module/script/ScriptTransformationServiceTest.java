@@ -224,4 +224,22 @@ public class ScriptTransformationServiceTest extends JavaTest {
 
         verify(scriptEngine).eval(INLINE_SCRIPT.substring(1));
     }
+
+    @Test
+    public void oversizedInlineScriptFailsFast() {
+        String largeInlineScript = "|" + "A".repeat(300_000);
+
+        TransformationException e = assertThrows(TransformationException.class,
+                () -> service.transform(largeInlineScript, "input"));
+
+        assertThat(e.getMessage(), containsString("too large"));
+    }
+
+    @Test
+    public void oversizedInputFailsFast() {
+        String bigInput = "A".repeat(250_000);
+        TransformationException e = assertThrows(TransformationException.class,
+                () -> service.transform(SCRIPT_UID, bigInput));
+        assertThat(e.getMessage(), containsString("Input payload is too large"));
+    }
 }

@@ -65,19 +65,37 @@ public class StringType implements PrimitiveType, State, Command {
 
     @Override
     public boolean equals(@Nullable Object obj) {
+        // Reflexive
         if (this == obj) {
             return true;
         }
-        if (obj == null) {
-            return false;
+        // Compare with another StringType
+        if (obj instanceof StringType other) {
+            return Objects.equals(this.value, other.value);
         }
+        // Compare directly with raw String
         if (obj instanceof String) {
-            return obj.equals(value);
+            return Objects.equals(this.value, obj);
         }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        StringType other = (StringType) obj;
-        return Objects.equals(this.value, other.value);
+        // Any other type (or null) is not equal
+        return false;
+    }
+
+    /**
+     * Checks whether the underlying string value is empty.
+     *
+     * @return true if the wrapped string is empty, false otherwise
+     */
+    public boolean isEmpty() {
+        return value.isEmpty();
+    }
+
+    /**
+     * Returns the length of the wrapped string value.
+     *
+     * @return the number of characters in the wrapped string
+     */
+    public int length() {
+        return value.length();
     }
 }

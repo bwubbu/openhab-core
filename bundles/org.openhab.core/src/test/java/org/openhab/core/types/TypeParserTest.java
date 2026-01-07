@@ -14,11 +14,14 @@ package org.openhab.core.types;
 
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.Collection;
 import java.util.List;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openhab.core.items.GenericItem;
@@ -59,5 +62,23 @@ class TypeParserTest {
     public void testAllDataTypes(ParameterSet parameterSet) {
         State subject = TypeParser.parseState(stringItem.getAcceptedDataTypes(), parameterSet.state);
         assertThat(subject, instanceOf(parameterSet.expectedDataType));
+    }
+
+    @Test
+    public void testParseState() {
+        List<Class<? extends State>> types = List.of(StringType.class);
+        State result = TypeParser.parseState(types, "ANY_VALUE");
+
+        assertNotNull(result);
+        assertEquals("ANY_VALUE", result.toString());
+    }
+
+    @Test
+    public void testParseCommand() {
+        List<Class<? extends Command>> types = List.of(StringType.class);
+        Command result = TypeParser.parseCommand(types, "ANY_COMMAND");
+
+        assertNotNull(result);
+        assertEquals("ANY_COMMAND", result.toString());
     }
 }

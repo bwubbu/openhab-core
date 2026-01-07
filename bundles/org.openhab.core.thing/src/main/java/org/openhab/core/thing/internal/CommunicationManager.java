@@ -522,11 +522,26 @@ public class CommunicationManager implements EventSubscriber, RegistryChangeList
         });
     }
 
+    /**
+     * Sends a {@link TimeSeries} to the linked items through their profiles.
+     * <p>
+     * Profiles that support TimeSeries (implement {@link TimeSeriesProfile}) will process the time series
+     * by applying their transformation logic to each entry. Currently, the following profiles support TimeSeries:
+     * <ul>
+     * <li>{@link SystemDefaultProfile} - Forwards time series directly to items</li>
+     * <li>{@link SystemOffsetProfile} - Applies offset transformation to each time series entry</li>
+     * <li>{@link SystemHysteresisStateProfile} - Applies hysteresis logic to each time series entry</li>
+     * <li>{@link SystemRangeStateProfile} - Applies range transformation to each time series entry</li>
+     * </ul>
+     * Profiles that do not support TimeSeries will log a warning and the time series will not be processed.
+     *
+     * @param channelUID the channel UID
+     * @param timeSeries the time series to send
+     */
     public void sendTimeSeries(ChannelUID channelUID, TimeSeries timeSeries) {
         ThingUID thingUID = channelUID.getThingUID();
         Thing thing = thingRegistry.get(thingUID);
         handleCallFromHandler(channelUID, thing, profile -> {
-            // TODO: check which profiles need enhancements
             if (profile instanceof TimeSeriesProfile timeSeriesProfile) {
                 timeSeriesProfile.onTimeSeriesFromHandler(timeSeries);
             } else {

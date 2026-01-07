@@ -43,6 +43,10 @@ import org.slf4j.LoggerFactory;
  */
 public class BusEvent {
 
+    private BusEvent() {
+        // Prevent instantiation
+    }
+
     /**
      * Sends a command for a specified item to the event bus.
      *
@@ -115,6 +119,122 @@ public class BusEvent {
             publisher.post(ItemEventFactory.createCommandEvent(item.getName(), command));
         }
         return null;
+    }
+
+    /**
+     * Sends a command for a specified item only if its current state is
+     * different from the provided value.
+     * <p>
+     * This is a convenience variant of {@link #sendCommand(String, String)}
+     * that avoids sending redundant commands when the item is already in the
+     * desired state.
+     *
+     * @param itemName the name of the item to send the command to (must not be {@code null} or empty)
+     * @param commandString the command to send (must not be {@code null})
+     * @return whatever {@link #sendCommand(String, String)} returns, or {@code null}
+     *         if no command was sent
+     */
+    public static Object sendIfChanged(String itemName, String commandString) {
+        if (itemName == null || itemName.isEmpty()) {
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged called with empty itemName - skipping");
+            return null;
+        }
+        if (commandString == null) {
+            LoggerFactory.getLogger(BusEvent.class)
+                    .warn("sendIfChanged for item '{}' with null commandString - skipping", itemName);
+            return null;
+        }
+
+        ItemRegistry registry = ScriptServiceUtil.getItemRegistry();
+        if (registry == null) {
+            LoggerFactory.getLogger(BusEvent.class)
+                    .warn("sendIfChanged: ItemRegistry not available, cannot resolve item '{}'", itemName);
+            return null;
+        }
+
+        try {
+            Item item = registry.getItem(itemName);
+            return sendIfChanged(item, commandString);
+        } catch (ItemNotFoundException e) {
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged: item '{}' does not exist - skipping",
+                    itemName);
+            return null;
+        }
+    }
+
+    /**
+     * Sends a command for a specified item only if its current state is
+     * different from the provided numeric value.
+     *
+     * @param itemName the name of the item to send the command to (must not be {@code null} or empty)
+     * @param number the number to send as a command (must not be {@code null})
+     * @return whatever {@link #sendIfChanged(String, String)} returns, or {@code null}
+     *         if no command was sent
+     */
+    public static Object sendIfChanged(String itemName, Number number) {
+        if (number == null) {
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged for item '{}' with null number - skipping",
+                    itemName);
+            return null;
+        }
+        return sendIfChanged(itemName, number.toString());
+    }
+
+    /**
+     * Sends a command for a specified item only if its current state is
+     * different from the provided value.
+     * <p>
+     * This variant operates directly on an {@link Item} instance.
+     *
+     * @param item the item to send the command to (must not be {@code null})
+     * @param commandString the command to send (must not be {@code null})
+     * @return whatever {@link #sendCommand(Item, String)} returns, or {@code null}
+     *         if no command was sent
+     */
+    public static Object sendIfChanged(Item item, String commandString) {
+        if (item == null) {
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged called with null Item - skipping");
+            return null;
+        }
+        if (commandString == null) {
+            LoggerFactory.getLogger(BusEvent.class)
+                    .warn("sendIfChanged for item '{}' with null commandString - skipping", item.getName());
+            return null;
+        }
+
+        State current = item.getState();
+        if (current != null && commandString.equals(current.toString())) {
+            // State already matches the desired command, skip sending
+            LoggerFactory.getLogger(BusEvent.class)
+                    .debug("sendIfChanged: item '{}' already in state '{}', skipping command", item.getName(), current);
+            return null;
+        }
+
+        // Delegate to existing sendCommand(Item, String) for actual dispatch
+        return sendCommand(item, commandString);
+    }
+
+    /**
+     * Sends a number as a command for a specified item only if its current state
+     * is different from the provided numeric value.
+     *
+     * @param item the item to send the command to (must not be {@code null})
+     * @param number the number to send as a command (must not be {@code null})
+     * @return whatever {@link #sendIfChanged(Item, String)} returns, or {@code null}
+     *         if no command was sent
+     */
+    public static Object sendIfChanged(Item item, Number number) {
+        if (item == null) {
+            LoggerFactory.getLogger(BusEvent.class)
+                    .warn("sendIfChanged called with null Item (number variant) - skipping");
+            return null;
+        }
+        if (number == null) {
+            LoggerFactory.getLogger(BusEvent.class).warn("sendIfChanged for item '{}' with null number - skipping",
+                    item.getName());
+            return null;
+        }
+        return sendIfChanged(item, number.toString());
     }
 
     /**
