@@ -10,6 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
+// Analysis Target for Assignment 2
 package org.openhab.core.io.net.http;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
