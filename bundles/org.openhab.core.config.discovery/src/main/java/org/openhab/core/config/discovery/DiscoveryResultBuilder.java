@@ -149,7 +149,8 @@ public class DiscoveryResultBuilder {
      */
     @SuppressWarnings("deprecation")
     public DiscoveryResult build() {
-        if (representationProperty != null && !properties.containsKey(representationProperty)) {
+        if (representationProperty != null && !properties.containsKey(representationProperty)
+                && logger.isWarnEnabled()) {
             logger.warn(
                     "Representation property '{}' of discovery result for thing '{}' is missing in properties map. It has to be fixed by the bindings developer.\n{}",
                     representationProperty, thingUID, getStackTrace(Thread.currentThread()));
