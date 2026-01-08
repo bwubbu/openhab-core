@@ -82,6 +82,12 @@ public class DialogRegistration {
      */
     public boolean running = false;
 
+    /**
+     * Creates a new DialogRegistration instance.
+     *
+     * @param sourceId the audio source id
+     * @param sinkId the audio sink id
+     */
     public DialogRegistration(String sourceId, String sinkId) {
         this.sourceId = sourceId;
         this.sinkId = sinkId;

@@ -55,21 +55,45 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
         private String keyword;
         private Locale locale;
 
+        /**
+         * Creates a new Builder instance.
+         *
+         * @param keyword the keyword for keyword spotting
+         * @param locale the locale for the dialog
+         */
         public Builder(String keyword, Locale locale) {
             this.keyword = keyword;
             this.locale = locale;
         }
 
+        /**
+         * Sets the audio source for the dialog.
+         *
+         * @param source the audio source, can be null
+         * @return this builder instance
+         */
         public Builder withSource(@Nullable AudioSource source) {
             this.source = source;
             return this;
         }
 
+        /**
+         * Sets the audio sink for the dialog.
+         *
+         * @param sink the audio sink, can be null
+         * @return this builder instance
+         */
         public Builder withSink(@Nullable AudioSink sink) {
             this.sink = sink;
             return this;
         }
 
+        /**
+         * Sets the keyword spotting service for the dialog.
+         *
+         * @param service the keyword spotting service, can be null
+         * @return this builder instance
+         */
         public Builder withKS(@Nullable KSService service) {
             if (service != null) {
                 this.ks = service;
@@ -77,6 +101,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the speech-to-text service for the dialog.
+         *
+         * @param service the speech-to-text service, can be null
+         * @return this builder instance
+         */
         public Builder withSTT(@Nullable STTService service) {
             if (service != null) {
                 this.stt = service;
@@ -84,6 +114,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the text-to-speech service for the dialog.
+         *
+         * @param service the text-to-speech service, can be null
+         * @return this builder instance
+         */
         public Builder withTTS(@Nullable TTSService service) {
             if (service != null) {
                 this.tts = service;
@@ -91,6 +127,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets a single human language interpreter for the dialog.
+         *
+         * @param service the human language interpreter, can be null
+         * @return this builder instance
+         */
         public Builder withHLI(@Nullable HumanLanguageInterpreter service) {
             if (service != null) {
                 this.hlis = List.of(service);
@@ -98,10 +140,22 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the human language interpreters for the dialog from a collection.
+         *
+         * @param services the collection of human language interpreters
+         * @return this builder instance
+         */
         public Builder withHLIs(Collection<HumanLanguageInterpreter> services) {
             return withHLIs(new ArrayList<>(services));
         }
 
+        /**
+         * Sets the human language interpreters for the dialog from a list.
+         *
+         * @param services the list of human language interpreters
+         * @return this builder instance
+         */
         public Builder withHLIs(List<HumanLanguageInterpreter> services) {
             if (!services.isEmpty()) {
                 this.hlis = services;
@@ -109,6 +163,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the keyword for keyword spotting.
+         *
+         * @param keyword the keyword, can be null or blank (will be ignored if blank)
+         * @return this builder instance
+         */
         public Builder withKeyword(@Nullable String keyword) {
             if (keyword != null && !keyword.isBlank()) {
                 this.keyword = keyword;
@@ -116,6 +176,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the voice for text-to-speech.
+         *
+         * @param voice the voice, can be null
+         * @return this builder instance
+         */
         public Builder withVoice(@Nullable Voice voice) {
             if (voice != null) {
                 this.voice = voice;
@@ -123,6 +189,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the dialog group name.
+         *
+         * @param dialogGroup the dialog group name, can be null
+         * @return this builder instance
+         */
         public Builder withDialogGroup(@Nullable String dialogGroup) {
             if (dialogGroup != null) {
                 this.dialogGroup = dialogGroup;
@@ -130,6 +202,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the location item for the dialog.
+         *
+         * @param locationItem the location item name, can be null
+         * @return this builder instance
+         */
         public Builder withLocationItem(@Nullable String locationItem) {
             if (locationItem != null) {
                 this.locationItem = locationItem;
@@ -137,6 +215,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the listening item for the dialog.
+         *
+         * @param listeningItem the listening item name, can be null
+         * @return this builder instance
+         */
         public Builder withListeningItem(@Nullable String listeningItem) {
             if (listeningItem != null) {
                 this.listeningItem = listeningItem;
@@ -144,6 +228,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the listening melody for the dialog.
+         *
+         * @param listeningMelody the listening melody, can be null
+         * @return this builder instance
+         */
         public Builder withMelody(@Nullable String listeningMelody) {
             if (listeningMelody != null) {
                 this.listeningMelody = listeningMelody;
@@ -151,6 +241,12 @@ public record DialogContext(@Nullable KSService ks, @Nullable String keyword, ST
             return this;
         }
 
+        /**
+         * Sets the locale for the dialog.
+         *
+         * @param locale the locale, can be null
+         * @return this builder instance
+         */
         public Builder withLocale(@Nullable Locale locale) {
             if (locale != null) {
                 this.locale = locale;
