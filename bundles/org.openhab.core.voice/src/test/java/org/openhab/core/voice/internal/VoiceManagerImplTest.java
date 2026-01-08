@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -41,12 +41,14 @@ import org.openhab.core.voice.STTException;
 import org.openhab.core.voice.STTListener;
 import org.openhab.core.voice.STTService;
 import org.openhab.core.voice.STTServiceHandle;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
  * Tests for {@link VoiceManagerImpl}.
  *
- * @author Addin Suhaimi
+ * @author Addin Suhaimi - Initial contribution
  */
+@NonNullByDefault
 public class VoiceManagerImplTest {
 
     @AfterEach

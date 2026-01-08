@@ -26,6 +26,19 @@ import org.openhab.core.voice.text.HumanLanguageInterpreter;
 /**
  * Describes dialog configured services and options.
  *
+ * @param ks the keyword spotting service, can be null
+ * @param keyword the keyword for keyword spotting, can be null
+ * @param stt the speech-to-text service
+ * @param tts the text-to-speech service
+ * @param voice the voice for text-to-speech, can be null
+ * @param hlis the list of human language interpreters
+ * @param source the audio source
+ * @param sink the audio sink
+ * @param locale the locale for the dialog
+ * @param dialogGroup the dialog group name
+ * @param locationItem the location item name, can be null
+ * @param listeningItem the listening item name, can be null
+ * @param listeningMelody the listening melody, can be null
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
