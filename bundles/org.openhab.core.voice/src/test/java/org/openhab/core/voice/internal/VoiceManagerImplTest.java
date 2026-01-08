@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.openhab.core.audio.AudioFormat;
@@ -41,7 +42,6 @@ import org.openhab.core.voice.STTException;
 import org.openhab.core.voice.STTListener;
 import org.openhab.core.voice.STTService;
 import org.openhab.core.voice.STTServiceHandle;
-import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
  * Tests for {@link VoiceManagerImpl}.
