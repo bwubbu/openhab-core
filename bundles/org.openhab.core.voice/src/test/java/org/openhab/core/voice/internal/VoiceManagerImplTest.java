@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.openhab.core.audio.AudioFormat;
@@ -172,7 +173,7 @@ public class VoiceManagerImplTest {
         }
 
         @Override
-        public String getLabel(Locale locale) {
+        public String getLabel(@Nullable Locale locale) {
             return "Test STT";
         }
 
