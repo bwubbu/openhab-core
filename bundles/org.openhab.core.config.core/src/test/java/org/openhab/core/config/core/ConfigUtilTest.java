@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.junit.jupiter.api.Test;
 import org.openhab.core.config.core.ConfigDescriptionParameter.Type;
 
@@ -30,7 +31,10 @@ import org.openhab.core.config.core.ConfigDescriptionParameter.Type;
  * - Correct type normalization behavior
  * - Defensive handling of invalid inputs
  * - Preservation of existing functionality after perfective maintenance
+ *
+ * @author Addin Suhaimi - Initial contribution
  */
+@NonNullByDefault
 class ConfigUtilTest {
 
     /* ---------- Utility class constructor ---------- */
