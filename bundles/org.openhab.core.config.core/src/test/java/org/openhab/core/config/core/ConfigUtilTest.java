@@ -17,9 +17,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openhab.core.config.core.ConfigDescriptionParameter.Type;
 
@@ -120,9 +122,11 @@ class ConfigUtilTest {
 
     @Test
     void testNormalizeTypesIgnoresOSGiParameters() {
-        Map<String, Object> input = Map.of("validKey", 10, org.osgi.framework.Constants.OBJECTCLASS, "ignored");
+        Map<String, @Nullable Object> input = new HashMap<>();
+        input.put("validKey", 10);
+        input.put(org.osgi.framework.Constants.OBJECTCLASS, "ignored");
 
-        Map<String, Object> result = ConfigUtil.normalizeTypes(input);
+        Map<String, @Nullable Object> result = ConfigUtil.normalizeTypes(input);
 
         assertTrue(result.containsKey("validKey"));
         assertFalse(result.containsKey(org.osgi.framework.Constants.OBJECTCLASS));
@@ -133,7 +137,8 @@ class ConfigUtilTest {
 
     @Test
     void testNormalizeTypesWithEmptyConfigDescriptionsThrowsException() {
-        Map<String, Object> config = Map.of("key", "value");
+        Map<String, @Nullable Object> config = new HashMap<>();
+        config.put("key", "value");
 
         assertThrows(IllegalArgumentException.class, () -> ConfigUtil.normalizeTypes(config, List.of()));
     }
