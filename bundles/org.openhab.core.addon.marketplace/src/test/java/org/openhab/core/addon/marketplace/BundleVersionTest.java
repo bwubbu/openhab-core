@@ -88,6 +88,9 @@ public class BundleVersionTest {
                 Arguments.of("[3.1.0;3.2.0]", true), // at end of range, inclusive
                 Arguments.of("[3.1.0;3.1.5)", false), // above range
                 Arguments.of("[3.3.0;3.4.0)", false), // below range
+                Arguments.of("[3.1.0;3.2)", false), // version range without micro in end (bug fix test case) - 3.2.0 is
+                                                    // at end, non-inclusive
+                Arguments.of("[3.1;3.2.0)", false), // version range without micro in start
                 Arguments.of("", true), // empty range assumes in range
                 Arguments.of(null, true));
     }
