@@ -18,10 +18,12 @@ import java.net.ServerSocket;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * {@link TestPortUtil} provides helper methods for working with ports in tests.
+ * {@link TestPortUtil} provides static helper methods for working with TCP/IP ports in unit tests.
+ * It helps avoid port conflicts during concurrent test execution.
  *
  * @author Henning Treu - Initial contribution
  * @author Wouter Born - Increase reusability
+ * @author Peng Mingyang - Documentation updates
  */
 @NonNullByDefault
 public final class TestPortUtil {
